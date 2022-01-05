@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import List, Tuple
+from typing import List
 from enum import Enum
 from graphviz import Digraph
 
@@ -92,7 +92,7 @@ class State:
         if self.is_out():
             return f"OUT(ID: {self.id}, CHAR: {self.char}, NEXT: {self.out.id})"
         elif self.is_split():
-            return f"SPLIT(ID: {self.id}, NEXT0: {self.out.id}, NEXT1: {self.out1.id})"
+            return f"SPLIT(ID: {self.id}, CHAR: {self.char}, NEXT0: {self.out.id}, NEXT1: {self.out1.id})"
         else:
             return "MATCH"
 
@@ -179,6 +179,19 @@ def append(ptrl1: Ptrlist, ptrl2: Ptrlist) -> Ptrlist:
 def post2nfa(post: str):
     stack: List[Frag] = list()
     nstate = 0
+
+    def create_state(type: StateType, nstate: int, out=None, out1=None, char=None):
+        s = State(type, nstate)
+        if type == StateType.OUT:
+            s.out = out
+            s.char = char
+        elif type == StateType.SPLIT:
+            s.out = out
+            s.out1 = out1
+            s.char = char
+        nstate += 1
+        return s, nstate
+
     for c in post:
         if c == ".":
             e2 = stack.pop()
@@ -188,53 +201,43 @@ def post2nfa(post: str):
         elif c == "|":
             e2 = stack.pop()
             e1 = stack.pop()
-            s = State(StateType.SPLIT, nstate)
-            nstate += 1
-            s.char = "|"
-            s.out = e1.start
-            s.out1 = e2.start
+            s, nstate = create_state(
+                StateType.SPLIT, nstate, out=e1.start, out1=e2.start, char="|"
+            )
             stack.append(Frag(s, append(e1.out, e2.out)))
         elif c == "?":
             e = stack.pop()
-            s = State(StateType.SPLIT, nstate)
-            nstate += 1
-            s.char = "?"
-            s.out = e.start
-            s.out1 = None
+            s, nstate = create_state(
+                StateType.SPLIT, nstate, out=e.start, out1=None, char="?"
+            )
             stack.append(Frag(s, append(e.out, Ptrlist(s, 1))))
         elif c == "*":
             e = stack.pop()
-            s = State(StateType.SPLIT, nstate)
-            nstate += 1
-            s.char = "*"
-            s.out = e.start
-            s.out1 = None
+            s, nstate = create_state(
+                StateType.SPLIT, nstate, out=e.start, out1=None, char="*"
+            )
             patch(e.out, s)
             stack.append(Frag(s, Ptrlist(s, 1)))
         elif c == "+":
             e = stack.pop()
-            s = State(StateType.SPLIT, nstate)
-            nstate += 1
-            s.char = "+"
-            s.out = e.start
-            s.out1 = None
+            s, nstate = create_state(
+                StateType.SPLIT, nstate, out=e.start, out1=None, char="+"
+            )
             patch(e.out, s)
             stack.append(Frag(e.start, Ptrlist(s, 1)))
         else:
-            s = State(StateType.OUT, nstate)
-            nstate += 1
-            s.char = c
-            s.out = None
+            s, nstate = create_state(StateType.OUT, nstate, out=None, char=c)
             stack.append(Frag(s, Ptrlist(s, 0)))
     e = stack.pop()
     assert len(stack) == 0
-    match = State(StateType.MATCH, nstate)
+    match, _ = create_state(StateType.MATCH, nstate)
     patch(e.out, match)
     return e.start
 
 
 class SList:
     def __init__(self):
+        # SListが格納するStateはStateType.OUTのみ
         self.s = []
         self.id = 0
 
@@ -255,10 +258,8 @@ def addstate(l: SList, s: State):
 
 
 def step(clist: SList, c: str):
-    id = clist.id
-
     nlist = SList()
-    nlist.id = id + 1
+    nlist.id = clist.id + 1
 
     for s in clist.s:
         if s.is_out() and s.char == c:
@@ -274,15 +275,11 @@ def ismatch(l: SList):
     return False
 
 
-def match(start: State, s: str) -> Tuple[bool, List[List[int]]]:
-    i = 0
-    c = 0
+def match(start: State, s: str, history=None) -> bool:
     clist = SList()
-    # SListが格納するStateは基本StateType.OUTなもののみ
-    # しかし、startはStateType.Splitの可能性があるため、addstate()でこれをケアする
     addstate(clist, start)
-    match_history = list()
     for c in s:
         clist = step(clist, c)
-        match_history.append([s.id for s in clist.s])
-    return ismatch(clist), match_history
+        if history is not None:
+            history.append([s.id for s in clist.s])
+    return ismatch(clist)

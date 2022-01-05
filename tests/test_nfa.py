@@ -67,6 +67,6 @@ def test_post2nfa():
 )
 def test_match(re, s, is_match):
     if is_match:
-        assert match(post2nfa(re2post(re)), s)[0]
+        assert match(post2nfa(re2post(re)), s)
     else:
-        assert not match(post2nfa(re2post(re)), s)[0]
+        assert not match(post2nfa(re2post(re)), s)
