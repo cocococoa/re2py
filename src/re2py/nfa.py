@@ -23,7 +23,7 @@ def re2post(re: str) -> str:
             natom = 0
         elif c == "|":
             if natom == 0:
-                raise RuntimeError("no atom in alt")
+                raise RuntimeError("no atom before alt '|'")
             while True:
                 natom -= 1
                 if natom == 0:
@@ -32,9 +32,9 @@ def re2post(re: str) -> str:
             nalt += 1
         elif c == ")":
             if len(paren) == 0:
-                raise RuntimeError("no open paren")
+                raise RuntimeError("no open parenthesis")
             if natom == 0:
-                raise RuntimeError("no atom in paren")
+                raise RuntimeError("no atom in parenthesis")
             while True:
                 natom -= 1
                 if natom == 0:
@@ -45,8 +45,7 @@ def re2post(re: str) -> str:
                     break
                 post += "|"
                 nalt -= 1
-            p = paren[-1]
-            paren.pop()
+            p = paren.pop()
             nalt = p.nalt
             natom = p.natom
             natom += 1
@@ -62,7 +61,7 @@ def re2post(re: str) -> str:
             natom += 1
 
     if len(paren) > 0:
-        raise RuntimeError("unclosed paren")
+        raise RuntimeError("unclosed parenthesis")
     while True:
         natom -= 1
         if natom == 0:
@@ -119,8 +118,7 @@ class State:
         pushed = set()
         graph = Digraph(format="png")
         while len(stack) > 0:
-            e = stack[-1]
-            stack.pop()
+            e = stack.pop()
             if e.id in pushed:
                 continue
 
@@ -183,17 +181,13 @@ def post2nfa(post: str):
     nstate = 0
     for c in post:
         if c == ".":
-            e2 = stack[-1]
-            stack.pop()
-            e1 = stack[-1]
-            stack.pop()
+            e2 = stack.pop()
+            e1 = stack.pop()
             patch(e1.out, e2.start)
             stack.append(Frag(e1.start, e2.out))
         elif c == "|":
-            e2 = stack[-1]
-            stack.pop()
-            e1 = stack[-1]
-            stack.pop()
+            e2 = stack.pop()
+            e1 = stack.pop()
             s = State(StateType.SPLIT, nstate)
             nstate += 1
             s.char = "|"
@@ -201,8 +195,7 @@ def post2nfa(post: str):
             s.out1 = e2.start
             stack.append(Frag(s, append(e1.out, e2.out)))
         elif c == "?":
-            e = stack[-1]
-            stack.pop()
+            e = stack.pop()
             s = State(StateType.SPLIT, nstate)
             nstate += 1
             s.char = "?"
@@ -210,8 +203,7 @@ def post2nfa(post: str):
             s.out1 = None
             stack.append(Frag(s, append(e.out, Ptrlist(s, 1))))
         elif c == "*":
-            e = stack[-1]
-            stack.pop()
+            e = stack.pop()
             s = State(StateType.SPLIT, nstate)
             nstate += 1
             s.char = "*"
@@ -220,8 +212,7 @@ def post2nfa(post: str):
             patch(e.out, s)
             stack.append(Frag(s, Ptrlist(s, 1)))
         elif c == "+":
-            e = stack[-1]
-            stack.pop()
+            e = stack.pop()
             s = State(StateType.SPLIT, nstate)
             nstate += 1
             s.char = "+"
@@ -235,8 +226,7 @@ def post2nfa(post: str):
             s.char = c
             s.out = None
             stack.append(Frag(s, Ptrlist(s, 0)))
-    e = stack[-1]
-    stack.pop()
+    e = stack.pop()
     assert len(stack) == 0
     match = State(StateType.MATCH, nstate)
     patch(e.out, match)
