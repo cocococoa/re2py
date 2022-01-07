@@ -51,7 +51,7 @@ def re2post(re: str) -> str:
             natom += 1
         elif c == "*" or c == "+" or c == "?":
             if natom == 0:
-                raise RuntimeError(f"no atom before 'c'")
+                raise RuntimeError(f"no atom before '{c}'")
             post += c
         else:
             if natom > 1:
@@ -82,6 +82,53 @@ class StateType(Enum):
     MATCH = 2
 
 
+class Graph:
+    def __init__(self, graph, nodes=None, edges=None, entry=None, match=None):
+        self.graph = graph
+        self.nodes = nodes
+        self.edges = edges
+        self.entry = entry
+        self.match = match
+
+    def number_of_nodes(self):
+        return len(self.nodes)
+
+    def number_of_edges(self):
+        return len(self.edges)
+
+    def node(self, id: int, color, shape, label, fillcolor="transparent"):
+        self.graph.node(
+            f"{self.nodes[id]._name()}",
+            color=color,
+            shape=shape,
+            label=label,
+            style="filled",
+            fillcolor=fillcolor,
+        )
+
+    def get_label(self, id: int):
+        if id == self.entry:
+            return "start"
+        elif id == self.match:
+            return "end"
+        else:
+            return f"s{id}"
+
+    def render(self, ofile):
+        self.graph.render(ofile)
+
+    def pipe(self, encoding):
+        return self.graph.pipe(encoding=encoding)
+
+    @property
+    def format(self):
+        return self.graph.format
+
+    @format.setter
+    def format(self, f):
+        self.graph.format = f
+
+
 class State:
     def __init__(self, type: StateType, id: int):
         self.type: StateType = type
@@ -105,7 +152,7 @@ class State:
     def is_match(self) -> bool:
         return self.type == StateType.MATCH
 
-    def __name(self):
+    def _name(self):
         if self.is_out():
             return f"{self.id}_{self.char}"
         elif self.is_split():
@@ -115,28 +162,48 @@ class State:
 
     def graph(self):
         stack = [self]
-        pushed = set()
         graph = Digraph(format="png")
+        states = dict()
+        edges = list()
+        entry = None
+        match = None
+
+        def get_label(id):
+            if id == entry:
+                return "start"
+            elif id == match:
+                return "end"
+            else:
+                return f"s{id}"
+
         while len(stack) > 0:
             e = stack.pop()
-            if e.id in pushed:
+            if e.id in states.keys():
                 continue
 
-            pushed.add(e.id)
-            graph.node(f"{e.__name()}")
+            if entry is None:
+                entry = e.id
+            if e.is_match():
+                match = e.id
+
+            states[e.id] = e
+            graph.node(f"{e._name()}", label=get_label(e.id))
             if e.is_out():
                 e0 = e.out
-                graph.edge(f"{e.__name()}", f"{e0.__name()}")
+                graph.edge(f"{e._name()}", f"{e0._name()}", label=f"{e.char}")
+                edges.append((e.id, e0.id))
                 stack.append(e0)
             elif e.is_split():
                 e0 = e.out
-                graph.edge(f"{e.__name()}", f"{e0.__name()}")
+                graph.edge(f"{e._name()}", f"{e0._name()}", label=f"{e.char}")
+                edges.append((e.id, e0.id))
                 stack.append(e0)
                 e1 = e.out1
-                graph.edge(f"{e.__name()}", f"{e1.__name()}")
+                graph.edge(f"{e._name()}", f"{e1._name()}", label=f"{e.char}")
+                edges.append((e.id, e1.id))
                 stack.append(e1)
 
-        return graph
+        return Graph(graph, states, edges, entry, match)
 
 
 class Ptrlist:
