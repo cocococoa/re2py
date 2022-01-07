@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ja">
+
+{% load static %}
+
+<head>
+    <title>Regex vizualizer</title>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+    <!-- My CSS -->
+    <link rel="stylesheet" type="text/css" href="{% static 'reviz/style.css' %}">
+</head>
+
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-sm">
+                <form action="{% url 'reviz:index' %}" method="POST">
+                    {% csrf_token %}
+                    <h2>Regex</h2>
+                    Supports only ( | ) * + ?. No escapes.
+                    <div class="mb-3">
+                        <textarea class="form-control" name="regex" rows="1">{{ regex }}</textarea>
+                    </div>
+                    {% if exception %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ exception }}
+                    </div>
+                    {% endif %}
+                    <h2>String</h2>
+                    <div class="mb-3">
+                        <textarea class="form-control" name="string" rows="1">{{ string }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+
+                    <br>
+                    <br>
+
+                    {% if regex_compiled %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col-auto">#</th>
+                                <th scope="col-sm">color</th>
+                                <th scope="col-sm">shape</th>
+                                <th scope="col-sm">label</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for node_config in svg_node_config %}
+                            <tr>
+                                <th scope="row">{{ node_config.name }}</th>
+                                <td>
+                                    {% if node_config.original_color %}
+                                    <label for="svg_node_config_color_{{ forloop.counter }}">
+                                        <input type="text" id="svg_node_config_color_{{ forloop.counter }}"
+                                            name="svg_node_config_color_{{ forloop.counter }}"
+                                            value="{{ node_config.color }}">
+                                    </label>
+                                    {% else %}
+                                    <label for="svg_node_config_color_{{ forloop.counter }}">
+                                        <input type="text" id="svg_node_config_color_{{ forloop.counter }}"
+                                            name="svg_node_config_color_{{ forloop.counter }}" placeholder="color">
+                                    </label>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if node_config.original_shape %}
+                                    <label for="svg_node_config_shape_{{ forloop.counter }}">
+                                        <input type="text" id="svg_node_config_shape_{{ forloop.counter }}"
+                                            name="svg_node_config_shape_{{ forloop.counter }}"
+                                            value="{{ node_config.shape }}">
+                                    </label>
+                                    {% else %}
+                                    <label for="svg_node_config_shape_{{ forloop.counter }}">
+                                        <input type="text" id="svg_node_config_shape_{{ forloop.counter }}"
+                                            name="svg_node_config_shape_{{ forloop.counter }}" placeholder="shape">
+                                    </label>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if node_config.original_label %}
+                                    <label for="svg_node_config_label_{{ forloop.counter }}">
+                                        <input type="text" id="svg_node_config_label_{{ forloop.counter }}"
+                                            name="svg_node_config_label_{{ forloop.counter }}"
+                                            value="{{ node_config.label }}">
+                                    </label>
+                                    {% else %}
+                                    <label for="svg_node_config_label_{{ forloop.counter }}">
+                                        <input type="text" id="svg_node_config_label_{{ forloop.counter }}"
+                                            name="svg_node_config_label_{{ forloop.counter }}" placeholder="label">
+                                    </label>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                    {% endif %}
+                    <br><br>
+                    <h2>References</h2>
+                    <ul>
+                        <li>
+                            <a href="https://swtch.com/~rsc/regexp/regexp1.html">Regular Expression Matching Can Be
+                                Simple And Fast</a>
+                        </li>
+                        <li>
+                            <a href="https://graphviz.org/doc/info/colors.html">Color list</a>
+                        </li>
+                        <li>
+                            <a href="https://graphviz.org/doc/info/shapes.html">Shape list</a>
+                        </li>
+                    </ul>
+                </form>
+            </div>
+
+            <div class="col-sm" style="text-align: center">
+                {% if regex_compiled %}
+                <h2 style="text-align: left">NFA</h2>
+                {{ svg|safe }}
+                {% endif %}
+
+                {% if simulation_compiled %}
+                <h2 style="text-align: left">NFA Simulation</h2>
+                <div id="svg_list" class="carousel carousel-dark slide" data-bs-ride="carousel">
+                    <div class="carousel-indicators">
+                        {% for s in svg_list %}
+                        {% if forloop.counter0 == 0 %}
+                        <button type="button" data-bs-target="#svg_list" data-bs-slide-to="{{ forloop.counter0 }}"
+                            class="active" aria-current="true" aria-label="Slide {{ forloop.counter0 }}"></button>
+                        {% else %}
+                        <button type="button" data-bs-target="#svg_list" data-bs-slide-to="{{ forloop.counter0 }}"
+                            aria-label="Slide {{ forloop.counter0 }}"></button>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div class="carousel-inner">
+                        {% for s in svg_list %}
+                        {% if forloop.counter0 == 0 %}
+                        <div class="carousel-item active">
+                            {{ s.svg|safe }}
+                            <br><br><br><br>
+                            <div class="carousel-caption d-none d-md-block">
+                                <h5>{{ s.tag|safe }}</h5>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="carousel-item">
+                            {{ s.svg|safe }}
+                            <br><br><br><br>
+                            <div class="carousel-caption d-none d-md-block">
+                                <h5>{{ s.tag|safe }}</h5>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#svg_list" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Previous</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#svg_list" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Next</span>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+        crossorigin="anonymous"></script>
+
+</body>
+
+</html>
